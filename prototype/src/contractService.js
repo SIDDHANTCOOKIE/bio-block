@@ -33,6 +33,11 @@ const CONTRACT_ABI = [
         name: "price",
         type: "uint256",
       },
+      {
+        internalType: "string",
+        name: "metadata",
+        type: "string",
+      },
     ],
     name: "storeDocument",
     outputs: [],
@@ -135,15 +140,57 @@ const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "ipfsHash",
+        type: "string",
+      },
+      {
+        internalType: "address",
+        name: "analyst",
+        type: "address",
+      },
+    ],
+    name: "grantAnalyticsAccess",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "ipfsHash",
+        type: "string",
+      },
+      {
+        internalType: "address",
+        name: "user",
+        type: "address",
+      },
+    ],
+    name: "hasAnalyticsAccess",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
 ];
 
-export const storeDocumentHash = async (ipfsHash, priceInEth) => {
+export const storeDocumentHash = async (ipfsHash, priceInEth, metadata = "") => {
   const provider = new ethers.BrowserProvider(window.ethereum);
   const signer = await provider.getSigner();
   const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
   const priceInWei = ethers.parseEther(priceInEth.toString());
-  const tx = await contract.storeDocument(ipfsHash, priceInWei);
+  const tx = await contract.storeDocument(ipfsHash, priceInWei, metadata);
   await tx.wait();
   console.log(`Transaction successful with hash: ${tx.hash}`);
   return tx.hash;
@@ -195,4 +242,21 @@ export const getEarnings = async (address) => {
 
   const earningsInWei = await contract.earnings(address);
   return ethers.formatEther(earningsInWei);
+};
+
+export const grantAnalyticsAccess = async (ipfsHash, analystAddress) => {
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const signer = await provider.getSigner();
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+  const tx = await contract.grantAnalyticsAccess(ipfsHash, analystAddress);
+  await tx.wait();
+  return tx.hash;
+};
+
+export const hasAnalyticsAccess = async (ipfsHash, userAddress) => {
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+  return await contract.hasAnalyticsAccess(ipfsHash, userAddress);
 };

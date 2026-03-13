@@ -14,6 +14,7 @@ contract DocumentStorage {
     mapping(string => string) public documentMetadata;
     mapping(string => address) public documentOwners;
     mapping(address => uint256) public earnings;
+    mapping(string => mapping(address => bool)) private analyticsAccess;
     
     function storeDocument(string memory ipfsHash, uint256 price, string memory metadata) public {
         require(documentOwners[ipfsHash] == address(0), "Document already exists");
@@ -74,6 +75,20 @@ contract DocumentStorage {
         (bool sent, ) = payable(msg.sender).call{value: amount}("");
         require(sent, "Transfer failed");
         emit WithdrawalSuccess(msg.sender, amount);
+    }
+
+    function grantAnalyticsAccess(string memory ipfsHash, address analyst) public {
+        require(documentOwners[ipfsHash] != address(0), "Document does not exist");
+        require(documentOwners[ipfsHash] == msg.sender, "Only owner can grant access");
+        require(analyst != address(0), "Invalid analyst");
+        analyticsAccess[ipfsHash][analyst] = true;
+    }
+
+    function hasAnalyticsAccess(string memory ipfsHash, address user) public view returns (bool) {
+        if (documentOwners[ipfsHash] == address(0) || user == address(0)) {
+            return false;
+        }
+        return documentOwners[ipfsHash] == user || analyticsAccess[ipfsHash][user];
     }
     
      function getMetadata(string memory ipfsHash) public view returns (string memory) {

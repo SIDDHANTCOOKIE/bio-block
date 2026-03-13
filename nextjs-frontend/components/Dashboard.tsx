@@ -7,6 +7,7 @@ import {
   withdrawEarnings,
   getMyDocuments,
   getDocumentPrice,
+  hasAnalyticsAccess,
 } from '../lib/contractService';
 import { decryptFile } from '../lib/encryptionUtils';
 
@@ -25,6 +26,17 @@ interface DownloadingState {
   [key: number]: boolean;
 }
 
+interface AnalyticsResponse {
+  dataset: string;
+  analysis_type: string;
+  results: Record<string, unknown>;
+  audit: {
+    tx_hash: string;
+    block_number: number;
+    gas_used: number;
+  };
+}
+
 export default function Dashboard({
   onBack,
   isWalletConnected,
@@ -37,6 +49,8 @@ export default function Dashboard({
   const [showDocuments, setShowDocuments] = useState<boolean>(false);
   const [loadingDocuments, setLoadingDocuments] = useState<boolean>(false);
   const [downloadingDocs, setDownloadingDocs] = useState<DownloadingState>({});
+  const [analyzingDocs, setAnalyzingDocs] = useState<DownloadingState>({});
+  const [analysisResult, setAnalysisResult] = useState<AnalyticsResponse | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     if (!isWalletConnected) return;
@@ -142,6 +156,56 @@ export default function Dashboard({
     }
   };
 
+  const handleAnalyze = async (doc: DocumentInfo, index: number) => {
+    setAnalyzingDocs((prev) => ({ ...prev, [index]: true }));
+
+    try {
+      const allowed = await hasAnalyticsAccess(doc.hash, walletAddress);
+      if (!allowed) {
+        throw new Error('No analytics access for this dataset');
+      }
+
+      if (!window.ethereum) {
+        throw new Error('Ethereum provider not found');
+      }
+
+      const message = `Bio-Block analytics request\nDataset: ${doc.hash}\nWallet: ${walletAddress}\nTimestamp: ${Date.now()}`;
+      const signature = await window.ethereum.request({
+        method: 'personal_sign',
+        params: [message, walletAddress],
+      }) as string;
+
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: '/py/api/v1/analytics/run',
+          method: 'POST',
+          body: {
+            dataset: doc.hash,
+            analysis_type: 'descriptive',
+            wallet_address: walletAddress,
+            message,
+            signature,
+          },
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Analytics request failed');
+      }
+
+      setAnalysisResult(payload as AnalyticsResponse);
+    } catch (error) {
+      console.error('Analytics error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Analysis failed: ${errorMessage}`);
+    } finally {
+      setAnalyzingDocs((prev) => ({ ...prev, [index]: false }));
+    }
+  };
+
   useEffect(() => {
     loadDashboardData();
   }, [isWalletConnected, walletAddress, loadDashboardData]);
@@ -221,45 +285,66 @@ export default function Dashboard({
             {documents.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No documents found</p>
             ) : (
-              <div className="space-y-4">
-                {documents.map((doc, index) => (
-                  <div
-                    key={index}
-                    className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-800 mb-1">
-                          Document #{index + 1}
-                        </h3>
-                        <p className="text-sm text-gray-600 break-all font-mono">
-                          {doc.hash}
-                        </p>
+              <>
+                <div className="space-y-4">
+                  {documents.map((doc, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-800 mb-1">
+                            Document #{index + 1}
+                          </h3>
+                          <p className="text-sm text-gray-600 break-all font-mono">
+                            {doc.hash}
+                          </p>
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="text-lg font-bold text-green-600">
+                            {doc.price} ETH
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="text-lg font-bold text-green-600">
-                          {doc.price} ETH
-                        </p>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => handleDownload(doc, index)}
+                            disabled={downloadingDocs[index]}
+                            className="text-blue-600 hover:text-blue-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {downloadingDocs[index] ? 'Downloading...' : 'Download'}
+                          </button>
+                          <button
+                            onClick={() => handleAnalyze(doc, index)}
+                            disabled={analyzingDocs[index]}
+                            className="text-indigo-600 hover:text-indigo-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {analyzingDocs[index] ? 'Analyzing...' : 'Analyze'}
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(doc.hash)}
+                          className="text-gray-500 hover:text-gray-700 text-sm"
+                        >
+                          Copy Hash
+                        </button>
                       </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <button
-                        onClick={() => handleDownload(doc, index)}
-                        disabled={downloadingDocs[index]}
-                        className="text-blue-600 hover:text-blue-800 text-sm disabled:text-gray-400 disabled:cursor-not-allowed"
-                      >
-                        {downloadingDocs[index] ? 'Downloading...' : 'Download'}
-                      </button>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(doc.hash)}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        Copy Hash
-                      </button>
-                    </div>
+                  ))}
+                </div>
+                {analysisResult && (
+                  <div className="mt-6 border border-indigo-200 bg-indigo-50 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-indigo-900 mb-2">
+                      Latest Analytics Result
+                    </h3>
+                    <pre className="text-xs text-indigo-900 overflow-auto whitespace-pre-wrap">
+                      {JSON.stringify(analysisResult, null, 2)}
+                    </pre>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         )}

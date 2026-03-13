@@ -2,6 +2,37 @@ const multer = require("multer");
 const axios = require("axios");
 const FormData = require("form-data");
 
+const formatPinataError = (error) => {
+  const responseData = error?.response?.data;
+
+  if (!responseData) {
+    return error?.message || "Unknown Pinata error";
+  }
+
+  if (typeof responseData === "string") {
+    return responseData;
+  }
+
+  if (typeof responseData.error === "string") {
+    return responseData.error;
+  }
+
+  if (responseData.error && typeof responseData.error === "object") {
+    if (typeof responseData.error.reason === "string") {
+      return responseData.error.reason;
+    }
+    if (typeof responseData.error.details === "string") {
+      return responseData.error.details;
+    }
+  }
+
+  if (typeof responseData.message === "string") {
+    return responseData.message;
+  }
+
+  return JSON.stringify(responseData);
+};
+
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -83,8 +114,9 @@ const uploadToIPFS = async (req, res) => {
       });
     }
 
+    const details = formatPinataError(error);
     res.status(500).json({
-      error: "IPFS upload failed: " + (error.response?.data?.error || error.message),
+      error: `IPFS upload failed: ${details}`,
     });
   }
 };

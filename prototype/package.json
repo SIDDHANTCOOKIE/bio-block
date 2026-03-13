@@ -19,7 +19,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy:mvp": "hardhat run scripts/deploy-mvp.js --network localhost"
   },
   "eslintConfig": {
     "extends": [

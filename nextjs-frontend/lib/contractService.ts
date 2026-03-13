@@ -1,7 +1,7 @@
 import { ethers, BrowserProvider, Contract } from 'ethers';
 import type { ContractABI } from './types';
 
-const CONTRACT_ADDRESS = '0xd58de64aac08d5412b8020c7c61b215fec0c9644';
+const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
 const CONTRACT_ABI: ContractABI[] = [
   {
@@ -34,6 +34,11 @@ const CONTRACT_ABI: ContractABI[] = [
         internalType: 'uint256',
         name: 'price',
         type: 'uint256',
+      },
+      {
+        internalType: 'string',
+        name: 'metadata',
+        type: 'string',
       },
     ],
     name: 'storeDocument',
@@ -137,6 +142,48 @@ const CONTRACT_ABI: ContractABI[] = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'ipfsHash',
+        type: 'string',
+      },
+      {
+        internalType: 'address',
+        name: 'analyst',
+        type: 'address',
+      },
+    ],
+    name: 'grantAnalyticsAccess',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'ipfsHash',
+        type: 'string',
+      },
+      {
+        internalType: 'address',
+        name: 'user',
+        type: 'address',
+      },
+    ],
+    name: 'hasAnalyticsAccess',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ];
 
 /**
@@ -172,12 +219,13 @@ const getContract = async (withSigner = true): Promise<Contract> => {
  */
 export const storeDocumentHash = async (
   ipfsHash: string,
-  priceInEth: number | string
+  priceInEth: number | string,
+  metadata: string = ''
 ): Promise<string> => {
   const contract = await getContract(true);
   const priceInWei = ethers.parseEther(priceInEth.toString());
 
-  const tx = await contract.storeDocument(ipfsHash, priceInWei);
+  const tx = await contract.storeDocument(ipfsHash, priceInWei, metadata);
   await tx.wait();
   return tx.hash;
 };
@@ -245,6 +293,37 @@ export const getEarnings = async (address: string): Promise<string> => {
 
   const earningsInWei = await contract.earnings(address);
   return ethers.formatEther(earningsInWei);
+};
+
+/**
+ * Grant analytics access for a dataset to an analyst address
+ * @param ipfsHash - Dataset CID/hash
+ * @param analystAddress - Wallet to authorize
+ * @returns Transaction hash
+ */
+export const grantAnalyticsAccess = async (
+  ipfsHash: string,
+  analystAddress: string
+): Promise<string> => {
+  const contract = await getContract(true);
+
+  const tx = await contract.grantAnalyticsAccess(ipfsHash, analystAddress);
+  await tx.wait();
+  return tx.hash;
+};
+
+/**
+ * Check whether a wallet has analytics access for a dataset
+ * @param ipfsHash - Dataset CID/hash
+ * @param userAddress - Wallet to verify
+ * @returns true if access exists
+ */
+export const hasAnalyticsAccess = async (
+  ipfsHash: string,
+  userAddress: string
+): Promise<boolean> => {
+  const contract = await getContract(false);
+  return await contract.hasAnalyticsAccess(ipfsHash, userAddress);
 };
 
 /**

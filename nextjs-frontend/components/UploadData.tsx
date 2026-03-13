@@ -195,8 +195,9 @@ export default function UploadData({
 
     if (!file) return;
 
-    const jsBackendUrl =
-      process.env.NEXT_PUBLIC_JS_BACKEND_URL || 'http://localhost:3001';
+    const jsBackendUrl = (
+      process.env.NEXT_PUBLIC_JS_BACKEND_URL || 'http://localhost:3001'
+    ).replace(/\/+$/, '');
     setIsGeneratingPreview(true);
 
     try {
@@ -376,12 +377,14 @@ export default function UploadData({
     let backendUrl: string, endpoint: string;
 
     if (file.type.startsWith('image/')) {
-      backendUrl =
-        process.env.NEXT_PUBLIC_PYTHON_BACKEND_URL || 'http://localhost:3002';
+      backendUrl = (
+        process.env.NEXT_PUBLIC_PYTHON_BACKEND_URL || 'http://localhost:3002'
+      ).replace(/\/+$/, '');
       endpoint = '/anonymize_image';
     } else if (file.name.match(/\.(xlsx|xls|csv|ods|tsv|xlsm|xlsb)$/i)) {
-      backendUrl =
-        process.env.NEXT_PUBLIC_JS_BACKEND_URL || 'http://localhost:3001';
+      backendUrl = (
+        process.env.NEXT_PUBLIC_JS_BACKEND_URL || 'http://localhost:3001'
+      ).replace(/\/+$/, '');
       endpoint = '/api/anonymize';
     } else {
       throw new Error(
@@ -451,8 +454,9 @@ export default function UploadData({
     formData.append('encryptedFile', blobData);
     formData.append('fileName', fileName);
 
-    const backendUrl =
-      process.env.NEXT_PUBLIC_JS_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = (
+      process.env.NEXT_PUBLIC_JS_BACKEND_URL || 'http://localhost:3001'
+    ).replace(/\/+$/, '');
 
     const response = await fetch(`${backendUrl}/api/ipfs/upload`, {
       method: 'POST',
@@ -662,8 +666,9 @@ export default function UploadData({
           ...(diseaseTags.length && { disease_tags: diseaseTags.join(', ') }),
         };
 
-        const pythonBackendUrl =
-          process.env.NEXT_PUBLIC_PYTHON_BACKEND_URL || 'http://localhost:3002';
+        const pythonBackendUrl = (
+          process.env.NEXT_PUBLIC_PYTHON_BACKEND_URL || 'http://localhost:3002'
+        ).replace(/\/+$/, '');
         const storeResponse = await fetch(`${pythonBackendUrl}/store`, {
           method: 'POST',
           headers: {
